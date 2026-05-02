@@ -2,16 +2,21 @@ import React, { useState, useRef } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Animated } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
-export default function RawDataContainer() {
+// Props define kiye hain taaki index.tsx se link ho sake
+interface RawDataProps {
+  onPlay: (data: string) => void;
+}
+
+export default function RawDataContainer({ onPlay }: RawDataProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [rawText, setRawText] = useState('');
   const [dataLog, setDataLog] = useState<string[]>(['Waiting for hardware data...']);
-  const expandAnim = useRef(new Animated.Value(60)).current; // Default height
+  const expandAnim = useRef(new Animated.Value(60)).current;
 
   const toggleExpand = () => {
     setIsExpanded(!isExpanded);
     Animated.timing(expandAnim, {
-      toValue: isExpanded ? 60 : 150, // 1 line vs 5 lines approx
+      toValue: isExpanded ? 60 : 180, // Thoda height badha di hai readability ke liye
       duration: 300,
       useNativeDriver: false,
     }).start();
@@ -19,9 +24,15 @@ export default function RawDataContainer() {
 
   const handleManualPlay = () => {
     if (rawText.trim() === '') return;
-    // Nayi reading ko list mein niche add karna
-    setDataLog(prev => [...prev.slice(-4), rawText]); 
-    // Yahan baad mein hum parseData(rawText) function call karenge cards update karne ke liye
+
+    // 1. Terminal log mein entry dikhao
+    setDataLog(prev => [...prev.slice(-10), rawText]); 
+    
+    // 2. Main cards update karne ke liye data index.tsx ko bhejo
+    onPlay(rawText); 
+    
+    // 3. Input clear kar do taaki agli entry kar sako
+    setRawText('');
   };
 
   const clearLog = () => {
@@ -36,6 +47,7 @@ export default function RawDataContainer() {
         <Animated.View style={[styles.terminalBox, { height: expandAnim }]}>
           <ScrollView 
             contentContainerStyle={{ flexGrow: 1, justifyContent: 'flex-end' }}
+            // Auto scroll to bottom taaki naya data dikhta rahe
             ref={(ref) => ref?.scrollToEnd({ animated: true })}
           >
             {dataLog.map((line, index) => (
@@ -45,17 +57,18 @@ export default function RawDataContainer() {
             ))}
           </ScrollView>
           
-          {/* Input field for Manual Data / Placeholder */}
+          {/* Input field: Ab ye manual data aur simulation dono ke liye ready hai */}
           <TextInput
             style={styles.hiddenInput}
-            placeholder="Type format: TDS:0,PH:0,TURB:0..."
-            placeholderTextColor="#1a4a1a"
+            placeholder="Format: TDS:500,PH:7,TEMP:25"
+            placeholderTextColor="#2a5a2a"
             value={rawText}
             onChangeText={setRawText}
+            onSubmitEditing={handleManualPlay} // Enter dabane par bhi play ho jayega
           />
         </Animated.View>
 
-        {/* Side Actions (Vertical) */}
+        {/* Side Actions */}
         <View style={styles.sideActions}>
           <TouchableOpacity onPress={() => console.log("Copied")}>
             <MaterialCommunityIcons name="content-copy" size={20} color="#00d4ff" />
@@ -64,12 +77,12 @@ export default function RawDataContainer() {
             <MaterialCommunityIcons name="delete-sweep" size={22} color="#ff4136" />
           </TouchableOpacity>
           <TouchableOpacity onPress={handleManualPlay} style={styles.actionGap}>
-            <MaterialCommunityIcons name="play-circle" size={24} color="#00ff00" />
+            {/* Play button hi trigger karega parsing logic ko */}
+            <MaterialCommunityIcons name="play-circle" size={28} color="#00ff00" />
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Expand Icon */}
       <TouchableOpacity onPress={toggleExpand} style={styles.expandBtn}>
         <MaterialCommunityIcons 
           name={isExpanded ? "chevron-up" : "chevron-down"} 
@@ -82,15 +95,8 @@ export default function RawDataContainer() {
 }
 
 const styles = StyleSheet.create({
-  outerContainer: {
-    alignItems: 'center',
-    marginVertical: 10,
-  },
-  mainWrapper: {
-    flexDirection: 'row',
-    width: '90%',
-    alignItems: 'center',
-  },
+  outerContainer: { alignItems: 'center', marginVertical: 10 },
+  mainWrapper: { flexDirection: 'row', width: '90%', alignItems: 'center' },
   terminalBox: {
     width: '85%',
     backgroundColor: '#000',
@@ -103,11 +109,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 5,
   },
-  terminalText: {
-    color: '#00ff00',
-    fontFamily: 'monospace',
-    fontSize: 12,
-  },
+  terminalText: { color: '#00ff00', fontFamily: 'monospace', fontSize: 11 },
   hiddenInput: {
     color: '#00ff00',
     fontFamily: 'monospace',
@@ -117,18 +119,7 @@ const styles = StyleSheet.create({
     marginTop: 5,
     paddingTop: 5,
   },
-  sideActions: {
-    width: '15%',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  actionGap: {
-    marginTop: 15,
-  },
-  expandBtn: {
-    marginTop: -5,
-    backgroundColor: '#001529',
-    borderRadius: 15,
-    paddingHorizontal: 10,
-  }
+  sideActions: { width: '15%', alignItems: 'center', justifyContent: 'center' },
+  actionGap: { marginTop: 15 },
+  expandBtn: { marginTop: -5, backgroundColor: '#001529', borderRadius: 15, paddingHorizontal: 10 }
 });
