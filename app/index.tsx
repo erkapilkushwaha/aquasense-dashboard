@@ -118,8 +118,10 @@ export default function AquaSenseApp() {
         // stickyHeaderIndices={[0]} // Agar aap chahte ho Header chipka rahe toh 0 karo, warna hata do
       >
         {/* Header ko ScrollView ke andar daal diya taaki scroll ho sake */}
-        <Header onDataReceived={parseAndUpdate}
-          onReset={resetData}/>
+        <Header 
+        onDataReceived={parseAndUpdate}
+        onReset={resetData}
+        />
         <SubHeader status={sensorData.tds > 0 ? "LIVE: Serial Active" : "Waiting for Data..."} />
 
         <RawDataContainer onPlay={parseAndUpdate} />
