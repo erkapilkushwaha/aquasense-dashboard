@@ -16,15 +16,21 @@ import Footer from '../components/Footer';
 import { SerialService } from '../services/SerialService';
 
 export default function AquaSenseApp() {
+  // --- STATE ---
   const [sensorData, setSensorData] = useState({
     tds: 0, ph: 7.0, temp: 0, turb: 0, flow: 0 
   });
 
   const [history, setHistory] = useState({
-    PH: [7, 7, 7, 7, 7], TDS: [0, 0, 0, 0, 0], TURB: [0, 0, 0, 0, 0],
-    TEMP: [0, 0, 0, 0, 0], FLOW: [0, 0, 0, 0, 0], OVERALL: [100, 100, 100, 100, 100]
+    PH: [7, 7, 7, 7, 7], 
+    TDS: [0, 0, 0, 0, 0], 
+    TURB: [0, 0, 0, 0, 0],
+    TEMP: [0, 0, 0, 0, 0], 
+    FLOW: [0, 0, 0, 0, 0], 
+    OVERALL: [100, 100, 100, 100, 100]
   });
 
+  // --- REFS & ANIMATION ---
   const mainScroll = useRef<ScrollView>(null);
   const dashboardRef = useRef<View>(null);
   const graphsRef = useRef<View>(null);
@@ -32,27 +38,49 @@ export default function AquaSenseApp() {
   const standardsRef = useRef<View>(null);
   const pulseAnim = useRef(new Animated.Value(0)).current;
 
-    const parseAndUpdate = (rawString: string) => {
+  // --- LOGIC: RESET DATA ---
+  const resetData = () => {
+    setSensorData({ tds: 0, ph: 7.0, temp: 0, turb: 0, flow: 0 });
+    setHistory({
+      PH: [7, 7, 7, 7, 7], 
+      TDS: [0, 0, 0, 0, 0], 
+      TURB: [0, 0, 0, 0, 0],
+      TEMP: [0, 0, 0, 0, 0], 
+      FLOW: [0, 0, 0, 0, 0], 
+      OVERALL: [100, 100, 100, 100, 100]
+    });
+    console.log("Data Reset Successfully");
+  };
+
+  // --- LOGIC: PARSE & UPDATE ---
+  const parseAndUpdate = (rawString: string) => {
+    if (!rawString || rawString.trim() === "" || rawString.includes("STOP")) {
+      resetData();
+      return;
+    }
+
     try {
-      console.log("Raw Input:", rawString);
-      
+      console.log("Processing Data:", rawString);
       let tds = 0, ph = 7, temp = 25, turb = 0;
 
-      // 1. Agar user "TDS:100,PH:7" jaisa likhe (Photo wala format)
+      // Format 1: TDS:500,PH:7 (Key-Value)
       if (rawString.includes(':')) {
         const parts = rawString.split(',');
         parts.forEach(part => {
-          const [key, val] = part.split(':');
-          const cleanKey = key.trim().toUpperCase();
-          const cleanVal = parseFloat(val);
-
-          if (cleanKey.includes('TDS')) tds = cleanVal;
-          if (cleanKey.includes('PH')) ph = cleanVal;
-          if (cleanKey.includes('TURB')) turb = cleanVal;
-          if (cleanKey.includes('TEMP')) temp = cleanVal;
+          const item = part.split(':');
+          if (item.length === 2) {
+            const key = item[0].trim().toUpperCase();
+            const val = parseFloat(item[1].trim());
+            if (!isNaN(val)) {
+              if (key.includes('TDS')) tds = val;
+              if (key.includes('PH')) ph = val;
+              if (key.includes('TURB')) turb = val;
+              if (key.includes('TEMP')) temp = val;
+            }
+          }
         });
       } 
-      // 2. Agar user simple "500|7|25|1" likhe (Purana format)
+      // Format 2: 500|7|25|0.5 (Separator)
       else {
         const values = rawString.split('|');
         tds = parseFloat(values[0]) || 0;
@@ -61,37 +89,37 @@ export default function AquaSenseApp() {
         turb = parseFloat(values[3]) || 0;
       }
 
-      // Update State
-      const newData = { tds, ph, temp, turb, flow: 0 };
-      setSensorData(newData);
+      // State Update
+      setSensorData({ tds, ph, temp, turb, flow: 0 });
 
-      // Update Graphs
+      // History/Graph Update
       setHistory(prev => ({
         PH: [...prev.PH.slice(1), ph],
         TDS: [...prev.TDS.slice(1), tds],
         TURB: [...prev.TURB.slice(1), turb],
         TEMP: [...prev.TEMP.slice(1), temp],
         FLOW: [...prev.FLOW.slice(1), 0],
-        OVERALL: [...prev.OVERALL.slice(1), (tds < 600 && ph > 6.5) ? 95 : 45]
+        OVERALL: [...prev.OVERALL.slice(1), (tds < 600 && ph > 6.5) ? 98 : 40]
       }));
 
     } catch (e) {
-      console.log("Parsing Error. Try Format: TDS:500,PH:7,TEMP:25,TURB:0.5");
+      console.log("Parsing Error in App.tsx");
     }
   };
 
-
+  // --- EFFECTS ---
   useEffect(() => {
     const initSerial = async () => {
       if (Platform.OS === 'android') {
         try { await SerialService.startConnection(parseAndUpdate); } 
-        catch (e) { console.log("Serial Error"); }
+        catch (e) { console.log("Serial Connection Failed"); }
       }
     };
     initSerial();
     return () => { if (Platform.OS === 'android') SerialService.stopConnection(); };
   }, []);
 
+  // --- UI HELPERS ---
   const highlightSection = (ref: any) => {
     ref.current?.measureLayout(mainScroll.current, (x: any, y: any) => {
       mainScroll.current?.scrollTo({ y: y - 50, animated: true });
@@ -104,7 +132,7 @@ export default function AquaSenseApp() {
 
   const highlightStyle = {
     backgroundColor: pulseAnim.interpolate({
-      inputRange: [0, 1], outputRange: ['transparent', 'rgba(0, 212, 255, 0.1)']
+      inputRange: [0, 1], outputRange: ['transparent', 'rgba(0, 212, 255, 0.05)']
     })
   };
 
@@ -112,15 +140,13 @@ export default function AquaSenseApp() {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" />
       
-      <ScrollView 
-        ref={mainScroll}
-        contentContainerStyle={styles.scrollContent}
-        // stickyHeaderIndices={[0]} // Agar aap chahte ho Header chipka rahe toh 0 karo, warna hata do
-      >
-        {/* Header ko ScrollView ke andar daal diya taaki scroll ho sake */}
-        <Header onDataReceived={parseAndUpdate}/>
-        <SubHeader status={sensorData.tds > 0 ? "LIVE: Serial Active" : "Waiting for Data..."} />
+      <ScrollView ref={mainScroll} contentContainerStyle={styles.scrollContent}>
+        {/* Pass parseAndUpdate to Header for the Switch logic */}
+        <Header onDataReceived={parseAndUpdate} />
+        
+        <SubHeader status={sensorData.tds > 0 ? "LIVE: Receiving Data" : "System Offline / Waiting..."} />
 
+        {/* Play button uses parseAndUpdate */}
         <RawDataContainer onPlay={parseAndUpdate} />
 
         <Animated.View ref={dashboardRef} style={[styles.section, highlightStyle]}>
@@ -128,7 +154,7 @@ export default function AquaSenseApp() {
             <SensorCard label="pH VALUE" value={sensorData.ph} unit="pH" icon="ph" color="#A020F0" />
             <SensorCard label="TDS PURITY" value={sensorData.tds} unit="PPM" icon="water-opacity" color="#00d4ff" />
             <SensorCard label="TEMPERATURE" value={sensorData.temp} unit="°C" icon="thermometer" color="#FF4136" />
-            <SensorCard label="TURBIDITY" value={sensorData.turb} unit="V" icon="waves" color="#FFB800" />
+            <SensorCard label="TURBIDITY" value={sensorData.turb} unit="NTU" icon="waves" color="#FFB800" />
             <SensorCard label="FLOW RATE" value={0} unit="L/m" icon="speedometer" color="#00FF00" />
             <ImageCard />
           </View>
@@ -156,8 +182,8 @@ export default function AquaSenseApp() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000' },
-  scrollContent: { paddingBottom: 20 },
-  section: { marginVertical: 12, borderRadius: 15 },
+  container: { flex: 1, backgroundColor: '#000814' },
+  scrollContent: { paddingBottom: 40 },
+  section: { marginVertical: 8, borderRadius: 15, overflow: 'hidden' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', paddingHorizontal: 5 },
 });
